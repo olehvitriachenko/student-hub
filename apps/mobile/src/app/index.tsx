@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { bindText, useObservables, useViewModel } from '../core/mvvm/hooks';
+import { bindText, useObservables } from '../core/mvvm/hooks';
+import { usePageViewModel } from '../core/mvvm/usePageViewModel';
 import { Badge, Card, CommandButton, Field, SectionTitle } from '../components/ui';
 import { isExcellent, type Student } from '../models/Student';
 import { StudentViewModel } from '../viewmodels/StudentViewModel';
+import { messenger, navigation } from '../services/instances';
 import { spacing, usePalette } from '../theme/theme';
 
 /**
@@ -13,8 +14,7 @@ import { spacing, usePalette } from '../theme/theme';
  * і викликає команди — жодного ручного звернення до елементів UI.
  */
 export default function MainPage() {
-  const [viewModel] = useState(() => new StudentViewModel());
-  const vm = useViewModel(viewModel); // підписка на PropertyChanged
+  const vm = usePageViewModel(() => new StudentViewModel(navigation, messenger));
   useObservables(vm.students); // підписка на CollectionChanged
   const c = usePalette();
 
@@ -61,24 +61,35 @@ export default function MainPage() {
           Список порожній — додайте першого студента
         </Text>
       }
-      renderItem={({ item }) => <StudentItem student={item} />}
+      renderItem={({ item }) => (
+        <StudentItem
+          student={item}
+          highlighted={item.id === vm.lastEditedId}
+          // Вибір елемента → OpenDetailsCommand з CommandParameter="{Binding .}"
+          onPress={() => vm.openDetailsCommand.execute(item)}
+        />
+      )}
     />
   );
 }
 
 /** ItemTemplate / DataTemplate елемента списку. */
-function StudentItem({ student }: { student: Student }) {
+function StudentItem({ student, highlighted, onPress }: { student: Student; highlighted: boolean; onPress: () => void }) {
   const c = usePalette();
   return (
-    <Card>
-      <View style={styles.itemRow}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{student.fullName}</Text>
-          <Text style={{ color: c.textMuted }}>{student.group || 'без групи'}</Text>
-        </View>
-        <Badge text={student.averageScore.toFixed(1)} tone={isExcellent(student) ? 'success' : 'muted'} />
-      </View>
-    </Card>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityHint="Відкрити деталі студента">
+      {({ pressed }) => (
+        <Card style={{ opacity: pressed ? 0.85 : 1, borderColor: highlighted ? c.primary : c.border }}>
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{student.fullName}</Text>
+              <Text style={{ color: c.textMuted }}>{student.group || 'без групи'}</Text>
+            </View>
+            <Badge text={student.averageScore.toFixed(1)} tone={isExcellent(student) ? 'success' : 'muted'} />
+          </View>
+        </Card>
+      )}
+    </Pressable>
   );
 }
 

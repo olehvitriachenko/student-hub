@@ -1,35 +1,47 @@
 import * as Crypto from 'expo-crypto';
 import { Command } from '../core/mvvm/Command';
 import { ObservableCollection } from '../core/mvvm/ObservableCollection';
-import { ObservableObject } from '../core/mvvm/ObservableObject';
+import { ViewModelBase } from '../core/mvvm/ViewModelBase';
+import type { Messenger } from '../core/mvvm/Messenger';
 import { isExcellent, type Student } from '../models/Student';
+import { BACK_ROUTE, type INavigationService, type IQueryAttributable, type QueryParams } from '../services/NavigationService';
 
 /**
- * StudentViewModel (лаб. 1).
+ * StudentViewModel.
  *
- * Частина 1: властивості з PropertyChanged і перевіркою на рівність,
- *            обчислювані greeting (OneWay) та isExcellent (візуальна індикація).
- * Частина 2: AddStudentCommand з CanExecute + ObservableCollection<Student>.
+ * Лаб. 1: властивості з PropertyChanged, greeting / isExcellent, AddStudentCommand, ObservableCollection.
+ * Лаб. 2: OpenDetailsCommand → навігація з передачею обраного Student;
+ *         отримання відредагованого запису назад двома способами:
+ *           1) параметри GoToAsync("..", parameters) → applyQueryAttributes;
+ *           2) повідомлення "StudentUpdated" через Messenger.
  */
-export class StudentViewModel extends ObservableObject {
-  // Інкапсульований об'єкт моделі (`private Student _student = new();`).
+export class StudentViewModel extends ViewModelBase implements IQueryAttributable {
   private readonly student: Omit<Student, 'id'> = { fullName: '', group: '', averageScore: 4.0 };
+  private _lastEditedId: string | null = null;
 
   readonly students = new ObservableCollection<Student>();
   readonly addStudentCommand: Command;
+  readonly openDetailsCommand: Command<Student>;
 
-  constructor() {
+  constructor(
+    private readonly navigation: INavigationService,
+    messenger: Messenger,
+  ) {
     super();
-    this.addStudentCommand = new Command(() => this.addStudent(), () => this.canAddStudent());
+    this.addStudentCommand = new Command(() => this.addStudent(), () => this.fullName.trim().length > 0);
+    this.openDetailsCommand = new Command<Student>((s) => this.openDetails(s));
+
+    // Спосіб 2: WeakReferenceMessenger.
+    this.track(messenger.register('StudentUpdated', (s) => this.students.replace((x) => x.id === s.id, s)));
   }
 
-  // ---------- Властивості для прив'язки (TwoWay) ----------
+  // ---------- Властивості (TwoWay) ----------
 
   get fullName() { return this.student.fullName; }
   set fullName(value: string) {
     if (this.setProperty('fullName', this.student.fullName, value, (v) => (this.student.fullName = v))) {
       this.onPropertyChanged('greeting');
-      this.addStudentCommand.raiseCanExecuteChanged(); // кнопка перевіряє CanExecute заново
+      this.addStudentCommand.raiseCanExecuteChanged();
     }
   }
 
@@ -48,23 +60,41 @@ export class StudentViewModel extends ObservableObject {
     }
   }
 
-  // ---------- Обчислювані властивості (OneWay) ----------
+  // ---------- Обчислювані (OneWay) ----------
 
-  /** «Студент: {FullName}, група {Group}» */
   get greeting(): string {
     if (!this.fullName.trim()) return 'Введіть дані студента';
     return `Студент: ${this.fullName}${this.group ? `, група ${this.group}` : ''}`;
   }
 
-  /** true, якщо AverageScore ≥ 4.0 — View фарбує вітання в зелений (замість IValueConverter). */
   get isExcellent(): boolean {
     return isExcellent(this.student);
   }
 
-  // ---------- Команди ----------
+  /** Підсвічуємо щойно відредагований запис. */
+  get lastEditedId() {
+    return this._lastEditedId;
+  }
 
-  private canAddStudent(): boolean {
-    return this.fullName.trim().length > 0;
+  // ---------- Навігація ----------
+
+  override onAppearing(): void {
+    // Спосіб 1: параметри, передані при поверненні GoToAsync("..", parameters).
+    const back = this.navigation.takeParams(BACK_ROUTE);
+    if (back) this.applyQueryAttributes(back);
+  }
+
+  applyQueryAttributes(query: QueryParams): void {
+    const updated = query.UpdatedStudent as Student | undefined;
+    if (!updated) return;
+    this.students.replace((x) => x.id === updated.id, updated);
+    this.setProperty('lastEditedId', this._lastEditedId, updated.id, (v) => (this._lastEditedId = v));
+  }
+
+  private openDetails(student: Student): void {
+    if (!student) return;
+    // Складний об'єкт — у словнику параметрів, без серіалізації в рядок.
+    this.navigation.goTo(`/students/${student.id}`, { SelectedStudent: student });
   }
 
   private addStudent(): void {
@@ -74,7 +104,6 @@ export class StudentViewModel extends ObservableObject {
       group: this.group.trim(),
       averageScore: this.averageScore,
     });
-    // Очистити поля вводу.
     this.fullName = '';
     this.group = '';
   }
