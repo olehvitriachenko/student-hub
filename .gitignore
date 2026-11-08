@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env*.local
+
+# API local database
+apps/api/*.db
+apps/api/*.db-*

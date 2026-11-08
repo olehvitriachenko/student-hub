@@ -1,0 +1,10 @@
+{
+  "name": "student-hub",
+  "private": true,
+  "description": "Особистий кабінет студента — React Native (Expo). Лабораторні роботи з мобільної розробки (MVVM).",
+  "scripts": {
+    "install:all": "npm --prefix apps/mobile install",
+    "mobile": "npm --prefix apps/mobile start",
+    "typecheck": "npm --prefix apps/mobile run typecheck"
+  }
+}
