@@ -1,27 +1,26 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Stack } from 'expo-router';
 import Slider from '@react-native-community/slider';
+import { Services } from '../AppServices';
 import { bindText, useObservables } from '../core/mvvm/hooks';
 import { usePageViewModel } from '../core/mvvm/usePageViewModel';
 import { Badge, Card, CommandButton, Field, SectionTitle } from '../components/ui';
 import { isExcellent, type Student } from '../models/Student';
-import { StudentViewModel } from '../viewmodels/StudentViewModel';
-import { messenger, navigation } from '../services/instances';
 import { spacing, usePalette } from '../theme/theme';
 
 /**
- * MainPage (View).
- * "BindingContext" = екземпляр StudentViewModel; компонент лише відображає його властивості
- * і викликає команди — жодного ручного звернення до елементів UI.
+ * MainPage (View): лише розмітка та прив'язки до StudentViewModel.
+ * Жодної бізнес-логіки й прямого звернення до сервісів — усе через властивості та команди VM.
  */
-export default function MainPage() {
-  const vm = usePageViewModel(() => new StudentViewModel(navigation, messenger));
-  useObservables(vm.students); // підписка на CollectionChanged
+export default function StudentListPage() {
+  const vm = usePageViewModel(Services.StudentViewModel);
+  useObservables(vm.students); // CollectionChanged
   const c = usePalette();
 
   const header = (
     <View style={{ gap: spacing.lg, paddingBottom: spacing.md }}>
       <Card>
-        {/* Mode=TwoWay */}
+        {/* TwoWay binding */}
         <Field label="ПІБ студента" placeholder="Іваненко Іван Іванович" {...bindText(vm, 'fullName')} />
         <Field label="Група" placeholder="ІПЗ-21" autoCapitalize="characters" {...bindText(vm, 'group')} />
         <View style={{ gap: spacing.xs }}>
@@ -38,10 +37,10 @@ export default function MainPage() {
           />
         </View>
 
-        {/* Mode=OneWay + візуальна індикація AverageScore ≥ 4.0 */}
+        {/* OneWay binding + візуальна індикація AverageScore ≥ 4.0 */}
         <Text style={[styles.greeting, { color: vm.isExcellent ? c.success : c.text }]}>{vm.greeting}</Text>
 
-        {/* Command="{Binding AddStudentCommand}" — блокується, поки ПІБ порожнє */}
+        {/* Command binding: кнопка блокується, поки ПІБ порожнє (CanExecute) */}
         <CommandButton command={vm.addStudentCommand} title="Додати студента" />
       </Card>
 
@@ -50,30 +49,38 @@ export default function MainPage() {
   );
 
   return (
-    <FlatList
-      data={vm.students.items}
-      keyExtractor={(s) => s.id}
-      contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
-      ListHeaderComponent={header}
-      keyboardShouldPersistTaps="handled"
-      ListEmptyComponent={
-        <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: spacing.xl }}>
-          Список порожній — додайте першого студента
-        </Text>
-      }
-      renderItem={({ item }) => (
-        <StudentItem
-          student={item}
-          highlighted={item.id === vm.lastEditedId}
-          // Вибір елемента → OpenDetailsCommand з CommandParameter="{Binding .}"
-          onPress={() => vm.openDetailsCommand.execute(item)}
-        />
-      )}
-    />
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => <CommandButton command={vm.openSettingsCommand} title="⚙︎" variant="secondary" compact />,
+        }}
+      />
+      <FlatList
+        data={vm.students.items}
+        keyExtractor={(s) => s.id}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+        ListHeaderComponent={header}
+        keyboardShouldPersistTaps="handled"
+        refreshing={vm.isBusy}
+        onRefresh={() => vm.loadCommand.execute()}
+        ListEmptyComponent={
+          <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: spacing.xl }}>
+            Список порожній — додайте першого студента
+          </Text>
+        }
+        renderItem={({ item }) => (
+          <StudentItem
+            student={item}
+            highlighted={item.id === vm.lastEditedId}
+            onPress={() => vm.openDetailsCommand.execute(item)}
+          />
+        )}
+      />
+    </>
   );
 }
 
-/** ItemTemplate / DataTemplate елемента списку. */
+/** DataTemplate елемента списку. */
 function StudentItem({ student, highlighted, onPress }: { student: Student; highlighted: boolean; onPress: () => void }) {
   const c = usePalette();
   return (
