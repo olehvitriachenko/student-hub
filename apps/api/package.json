@@ -1,0 +1,21 @@
+{
+  "name": "student-hub-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fastify REST API for Student Hub (sync target for the mobile app)",
+  "scripts": {
+    "dev": "node --watch src/server.ts",
+    "start": "node src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.4.1",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

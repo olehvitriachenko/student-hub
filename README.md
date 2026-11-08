@@ -1,12 +1,13 @@
 # Student Hub — «Особистий кабінет студента»
 
-Гілка **lab3** — стан проєкту після лабораторної роботи № 3. Застосунок на React Native (Expo SDK 58, Expo Router).
+Гілка **lab4** — стан проєкту після лабораторної роботи № 4. Застосунок на React Native (Expo SDK 58, Expo Router) з бекендом на Fastify.
 Повна версія з усіма лабораторними — гілки `lab5` / `main`.
 
 ## Запуск
 
 ```bash
 npm run install:all
+npm run api                  # API на http://0.0.0.0:3000
 npm run mobile               # Metro; відкрийте в Expo Go / емуляторі
 npm run typecheck
 ```
@@ -23,3 +24,5 @@ npm run typecheck
 npx uri-scheme open "studenthub://students/<id>" --ios      # або --android
 # Expo Go: exp://<ip>:8081/--/students/<id>
 ```
+
+**Лаб. 4 — Локальна БД і синхронізація.** Схема (`students`, `sync_queue`) з міграціями за `PRAGMA user_version`. CRUD через `IStudentRepository`. Offline-first: кожна зміна спершу пишеться в SQLite + чергу в одній транзакції; `SyncService` при появі мережі (NetInfo) відправляє чергу (`PUT`/`DELETE`), потім забирає зміни з сервера (`GET /students?since=`). Конфлікти — **last-write-wins** за `updatedAt` (сервер повертає `409` зі своєю версією, якщо вона новіша). `documentNumber` шифрується AES-256-CBC перед записом у БД; ключ — у SecureStore.

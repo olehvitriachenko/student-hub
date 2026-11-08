@@ -14,7 +14,7 @@ import { spacing, usePalette } from '../theme/theme';
  */
 export default function StudentListPage() {
   const vm = usePageViewModel(Services.StudentViewModel);
-  useObservables(vm.students); // CollectionChanged
+  useObservables(vm.students, vm.sync); // CollectionChanged + стан синхронізації
   const c = usePalette();
 
   const header = (
@@ -23,6 +23,12 @@ export default function StudentListPage() {
         {/* TwoWay binding */}
         <Field label="ПІБ студента" placeholder="Іваненко Іван Іванович" {...bindText(vm, 'fullName')} />
         <Field label="Група" placeholder="ІПЗ-21" autoCapitalize="characters" {...bindText(vm, 'group')} />
+        <Field
+          label="Номер документа (шифрується в БД)"
+          placeholder="AB123456"
+          autoCapitalize="characters"
+          {...bindText(vm, 'documentNumber')}
+        />
         <View style={{ gap: spacing.xs }}>
           <Text style={{ color: c.textMuted, fontSize: 13 }}>Середній бал: {vm.averageScore.toFixed(1)}</Text>
           <Slider
@@ -44,7 +50,10 @@ export default function StudentListPage() {
         <CommandButton command={vm.addStudentCommand} title="Додати студента" />
       </Card>
 
-      <SectionTitle>Студенти ({vm.students.count})</SectionTitle>
+      <View style={styles.listHeader}>
+        <SectionTitle>Студенти ({vm.students.count})</SectionTitle>
+        <SyncStatus online={vm.sync.isOnline} syncing={vm.sync.isSyncing} pending={vm.sync.pendingCount} />
+      </View>
     </View>
   );
 
@@ -52,7 +61,12 @@ export default function StudentListPage() {
     <>
       <Stack.Screen
         options={{
-          headerRight: () => <CommandButton command={vm.openSettingsCommand} title="⚙︎" variant="secondary" compact />,
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <CommandButton command={vm.syncCommand} title="⟳" variant="secondary" compact />
+              <CommandButton command={vm.openSettingsCommand} title="⚙︎" variant="secondary" compact />
+            </View>
+          ),
         }}
       />
       <FlatList
@@ -100,7 +114,14 @@ function StudentItem({ student, highlighted, onPress }: { student: Student; high
   );
 }
 
+function SyncStatus({ online, syncing, pending }: { online: boolean; syncing: boolean; pending: number }) {
+  if (syncing) return <Badge text="синхронізація…" tone="warning" />;
+  if (!online) return <Badge text={`офлайн · ${pending} в черзі`} tone="danger" />;
+  return <Badge text={pending ? `${pending} в черзі` : 'синхронізовано'} tone={pending ? 'warning' : 'success'} />;
+}
+
 const styles = StyleSheet.create({
   greeting: { fontSize: 16, fontWeight: '600' },
+  listHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
 });

@@ -9,6 +9,7 @@ import { isExcellent, validateStudent, type Student } from '../models/Student';
 import type { AppLifecycleService } from '../services/AppLifecycleService';
 import { BACK_ROUTE, type INavigationService, type IQueryAttributable, type QueryParams } from '../services/NavigationService';
 import type { IPreferences } from '../services/Preferences';
+import type { SyncService } from '../services/SyncService';
 
 const DRAFT_KEY = 'draft.newStudent';
 
@@ -16,6 +17,7 @@ interface Draft {
   fullName: string;
   group: string;
   averageScore: number;
+  documentNumber: string;
 }
 
 /**
@@ -26,11 +28,11 @@ interface Draft {
  * Лаб. 2: OpenDetailsCommand → навігація з передачею об'єкта Student;
  *         отримання оновленого запису назад (query-параметри + Messenger).
  * Лаб. 3: OnAppearing → LoadCommand; збереження чернетки форми на Stopped.
- * Лаб. 3: CRUD через репозиторій (поки що збереження в Preferences).
+ * Лаб. 4: CRUD через репозиторій, SyncCommand.
  */
 export class StudentViewModel extends ViewModelBase implements IQueryAttributable {
   // Інкапсульований об'єкт моделі, як `_student` у прикладі з лаб. 1.
-  private readonly draft: Draft = { fullName: '', group: '', averageScore: 4.0 };
+  private readonly draft: Draft = { fullName: '', group: '', averageScore: 4.0, documentNumber: '' };
 
   readonly students = new ObservableCollection<Student>();
 
@@ -38,6 +40,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
   readonly openDetailsCommand: Command<Student>;
   readonly deleteStudentCommand: Command<Student>;
   readonly loadCommand: Command;
+  readonly syncCommand: Command;
   readonly openSettingsCommand: Command;
 
   private _lastEditedId: string | null = null;
@@ -46,6 +49,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     private readonly repository: IStudentRepository,
     private readonly navigation: INavigationService,
     private readonly messenger: Messenger,
+    readonly sync: SyncService,
     private readonly prefs: IPreferences,
     lifecycle: AppLifecycleService,
     private readonly log: ILogger,
@@ -55,11 +59,14 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     this.openDetailsCommand = new Command<Student>((s) => this.openDetails(s));
     this.deleteStudentCommand = new Command<Student>((s) => this.deleteStudent(s));
     this.loadCommand = new Command(() => this.load());
+    this.syncCommand = new Command(() => this.sync.sync(), () => !this.sync.isSyncing);
     this.openSettingsCommand = new Command(() => this.navigation.goTo('/settings'));
 
     // Лаб. 2, ч. 2: оновлення списку через повідомлення від сторінки деталей.
     this.track(messenger.register('StudentUpdated', (s) => this.upsertInList(s)));
     this.track(messenger.register('StudentDeleted', ({ id }) => this.students.remove((x) => x.id === id)));
+    this.track(messenger.register('StudentsSynced', () => void this.load()));
+    this.track(sync.subscribe(() => this.syncCommand.raiseCanExecuteChanged()));
 
     // Лаб. 3: зберегти чернетку форми при згортанні застосунку.
     this.track(lifecycle.on((e) => (e === 'Stopped' ? this.saveDraft() : undefined)));
@@ -89,6 +96,11 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     if (this.setProperty('averageScore', this.draft.averageScore, rounded, (v) => (this.draft.averageScore = v))) {
       this.onPropertyChanged('isExcellent');
     }
+  }
+
+  get documentNumber() { return this.draft.documentNumber; }
+  set documentNumber(value: string) {
+    this.setProperty('documentNumber', this.draft.documentNumber, value, (v) => (this.draft.documentNumber = v));
   }
 
   // ---------- Обчислювані властивості (OneWay) ----------
@@ -147,6 +159,9 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
       fullName: this.fullName.trim(),
       group: this.group.trim(),
       averageScore: this.averageScore,
+      documentNumber: this.documentNumber.trim(),
+      updatedAt: Date.now(),
+      deleted: false,
     };
     await this.repository.save(student);
     this.students.insert(0, student);
@@ -154,7 +169,9 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     // Очистити поля вводу.
     this.fullName = '';
     this.group = '';
+    this.documentNumber = '';
     await this.prefs.remove(DRAFT_KEY);
+    void this.sync.notifyLocalChange();
   }
 
   private openDetails(student: Student): void {
@@ -166,6 +183,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
   private async deleteStudent(student: Student): Promise<void> {
     await this.repository.delete(student.id);
     this.students.remove((s) => s.id === student.id);
+    void this.sync.notifyLocalChange();
   }
 
   private async load(): Promise<void> {
@@ -189,7 +207,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
   // ---------- Збереження стану форми (лаб. 3) ----------
 
   private async saveDraft() {
-    if (!this.fullName && !this.group) return;
+    if (!this.fullName && !this.group && !this.documentNumber) return;
     await this.prefs.setJson(DRAFT_KEY, this.draft);
     this.log.info('Form draft saved on Stopped');
   }
@@ -200,6 +218,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     this.fullName = saved.fullName;
     this.group = saved.group;
     this.averageScore = saved.averageScore;
+    this.documentNumber = saved.documentNumber;
     this.log.info('Form draft restored');
   }
 }

@@ -1,10 +1,12 @@
 {
   "name": "student-hub",
   "private": true,
-  "description": "Особистий кабінет студента — React Native (Expo). Лабораторні роботи з мобільної розробки (MVVM).",
+  "description": "Особистий кабінет студента — React Native (Expo) + Fastify. Лабораторні роботи 1–5 з мобільної розробки (MVVM).",
   "scripts": {
-    "install:all": "npm --prefix apps/mobile install",
+    "install:all": "npm --prefix apps/api install && npm --prefix apps/mobile install",
+    "api": "npm --prefix apps/api run dev",
     "mobile": "npm --prefix apps/mobile start",
-    "typecheck": "npm --prefix apps/mobile run typecheck"
+    "typecheck": "npm --prefix apps/api run typecheck && npm --prefix apps/mobile run typecheck",
+    "test": "npm --prefix apps/api test"
   }
 }

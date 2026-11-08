@@ -8,6 +8,7 @@ import type { AppLifecycleService } from '../services/AppLifecycleService';
 import type { AppStateService } from '../services/AppStateService';
 import type { INavigationService, IQueryAttributable, QueryParams } from '../services/NavigationService';
 import type { IPreferences } from '../services/Preferences';
+import type { SyncService } from '../services/SyncService';
 
 const draftKey = (id: string) => `draft.student.${id}`;
 
@@ -18,22 +19,26 @@ const draftKey = (id: string) => `draft.student.${id}`;
  *         GoBackCommand, SaveCommand з передачею оновленого запису назад.
  * Лаб. 3: deep link studenthub://students/<id> → loadById (аналог [QueryProperty]);
  *         збереження чернетки редагування при згортанні застосунку.
- * Лаб. 3: Update / Delete через репозиторій.
+ * Лаб. 4: Update / Delete через репозиторій.
  */
 export class StudentDetailViewModel extends ViewModelBase implements IQueryAttributable {
   private original: Student | null = null;
   private _averageScore = 0;
   private _group = '';
+  private _documentNumber = '';
+  private _showDocument = false;
   private _notFound = false;
 
   readonly goBackCommand: Command;
   readonly saveCommand: Command;
   readonly deleteCommand: Command;
+  readonly toggleDocumentCommand: Command;
 
   constructor(
     private readonly repository: IStudentRepository,
     private readonly navigation: INavigationService,
     private readonly messenger: Messenger,
+    private readonly sync: SyncService,
     private readonly prefs: IPreferences,
     lifecycle: AppLifecycleService,
     private readonly appState: AppStateService,
@@ -43,6 +48,10 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     this.goBackCommand = new Command(() => this.navigation.goBack());
     this.saveCommand = new Command(() => this.save(), () => this.isDirty && this.validationError === null);
     this.deleteCommand = new Command(() => this.delete(), () => this.original !== null);
+    this.toggleDocumentCommand = new Command(() => {
+      this.setProperty('showDocument', this._showDocument, !this._showDocument, (v) => (this._showDocument = v));
+    });
+
     this.track(lifecycle.on((e) => (e === 'Stopped' ? this.saveDraft() : undefined)));
   }
 
@@ -51,6 +60,7 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
   get id() { return this.original?.id ?? ''; }
   get fullName() { return this.original?.fullName ?? ''; }
   get notFound() { return this._notFound; }
+  get showDocument() { return this._showDocument; }
 
   get group() { return this._group; }
   set group(v: string) { this.setEditable('group', this._group, v, (x) => (this._group = x)); }
@@ -63,11 +73,20 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     }
   }
 
+  get documentNumber() { return this._documentNumber; }
+  set documentNumber(v: string) { this.setEditable('documentNumber', this._documentNumber, v, (x) => (this._documentNumber = x)); }
+
+  /** Маскований номер документа — розшифровується лише на вимогу. */
+  get documentNumberDisplay(): string {
+    if (!this._documentNumber) return '—';
+    return this._showDocument ? this._documentNumber : '•'.repeat(Math.max(4, this._documentNumber.length - 2)) + this._documentNumber.slice(-2);
+  }
+
   get isExcellent() { return isExcellent({ averageScore: this._averageScore }); }
 
   get isDirty(): boolean {
     const o = this.original;
-    return !!o && (o.group !== this._group || o.averageScore !== this._averageScore);
+    return !!o && (o.group !== this._group || o.averageScore !== this._averageScore || o.documentNumber !== this._documentNumber);
   }
 
   get validationError(): string | null {
@@ -88,7 +107,7 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     this.setBusy(true);
     try {
       const student = await this.repository.getById(id);
-      if (!student) {
+      if (!student || student.deleted) {
         this.log.warn('Student not found', { id });
         this.setProperty('notFound', this._notFound, true, (v) => (this._notFound = v));
         return;
@@ -104,11 +123,12 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     this.appState.setSelectedStudent(student.id);
     this._group = student.group;
     this._averageScore = student.averageScore;
+    this._documentNumber = student.documentNumber;
 
     // Відновлюємо незбережені правки, якщо застосунок був згорнутий під час редагування.
-    const draft = await this.prefs.getJson<Pick<Student, 'group' | 'averageScore'>>(draftKey(student.id));
+    const draft = await this.prefs.getJson<Pick<Student, 'group' | 'averageScore' | 'documentNumber'>>(draftKey(student.id));
     if (draft) {
-      Object.assign(this, { _group: draft.group, _averageScore: draft.averageScore });
+      Object.assign(this, { _group: draft.group, _averageScore: draft.averageScore, _documentNumber: draft.documentNumber });
       this.log.info('Edit draft restored', { id: student.id });
     }
     this.onPropertyChanged('*');
@@ -123,6 +143,8 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
       ...this.original,
       group: this._group.trim(),
       averageScore: this._averageScore,
+      documentNumber: this._documentNumber.trim(),
+      updatedAt: Date.now(),
     };
     await this.repository.save(updated);
     this.original = updated;
@@ -132,6 +154,7 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     // Повертаємо оновлений об'єкт двома способами:
     this.messenger.send('StudentUpdated', updated); // WeakReferenceMessenger
     this.navigation.goBack({ UpdatedStudent: updated }); // GoToAsync("..", parameters)
+    void this.sync.notifyLocalChange();
   }
 
   private async delete(): Promise<void> {
@@ -141,6 +164,7 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     await this.prefs.remove(draftKey(id));
     this.messenger.send('StudentDeleted', { id });
     this.navigation.goBack();
+    void this.sync.notifyLocalChange();
   }
 
   override dispose(): void {
@@ -166,6 +190,7 @@ export class StudentDetailViewModel extends ViewModelBase implements IQueryAttri
     await this.prefs.setJson(draftKey(this.original.id), {
       group: this._group,
       averageScore: this._averageScore,
+      documentNumber: this._documentNumber,
     });
     this.log.info('Edit draft saved on Stopped', { id: this.original.id });
   }

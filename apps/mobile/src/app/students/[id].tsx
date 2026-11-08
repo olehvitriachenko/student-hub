@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import { Services, container } from '../../AppServices';
@@ -51,6 +51,14 @@ export default function StudentDetailPage() {
           label="Середній бал"
           value={<Badge text={vm.averageScore.toFixed(1)} tone={vm.isExcellent ? 'success' : 'muted'} />}
         />
+        <Row
+          label="Документ"
+          value={
+            <Pressable onPress={() => vm.toggleDocumentCommand.execute()} accessibilityRole="button">
+              <Text style={{ color: c.primary, fontWeight: '500' }}>{vm.documentNumberDisplay}</Text>
+            </Pressable>
+          }
+        />
         <Text style={{ color: c.textMuted, fontSize: 12 }}>
           Deep link: studenthub://students/{vm.id}
         </Text>
@@ -59,6 +67,7 @@ export default function StudentDetailPage() {
       <SectionTitle>Редагування</SectionTitle>
       <Card>
         <Field label="Група" {...bindText(vm, 'group')} autoCapitalize="characters" />
+        <Field label="Номер документа" {...bindText(vm, 'documentNumber')} autoCapitalize="characters" />
         <View style={{ gap: spacing.xs }}>
           <Text style={{ color: c.textMuted, fontSize: 13 }}>Середній бал: {vm.averageScore.toFixed(1)}</Text>
           <Slider

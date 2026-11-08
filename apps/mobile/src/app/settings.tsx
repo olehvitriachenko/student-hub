@@ -11,6 +11,8 @@ const THEMES: { value: ThemePreference; label: string }[] = [
   { value: 'dark', label: 'Темна' },
 ];
 
+const time = (t: number | null) => (t ? new Date(t).toLocaleTimeString() : '—');
+
 export default function SettingsPage() {
   const vm = usePageViewModel(Services.SettingsViewModel);
   const c = usePalette();
@@ -32,6 +34,16 @@ export default function SettingsPage() {
           ))}
         </View>
         <Text style={{ color: c.textMuted, fontSize: 12 }}>Вибір зберігається між запусками (Preferences).</Text>
+      </Card>
+
+      <SectionTitle>Синхронізація</SectionTitle>
+      <Card>
+        <Row label="Мережа" value={vm.sync.isOnline ? 'онлайн' : 'офлайн'} />
+        <Row label="API" value={vm.sync.apiUrl} />
+        <Row label="Змін у черзі" value={String(vm.sync.pendingCount)} />
+        <Row label="Остання синхронізація" value={time(vm.sync.lastSyncAt)} />
+        {vm.sync.lastError && <Text style={{ color: c.danger }}>{vm.sync.lastError}</Text>}
+        <CommandButton command={vm.syncNowCommand} title={vm.sync.isSyncing ? 'Синхронізація…' : 'Синхронізувати зараз'} />
       </Card>
 
       <SectionTitle>Сесія та життєвий цикл</SectionTitle>
