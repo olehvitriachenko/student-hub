@@ -60,6 +60,18 @@ export default function SettingsPage() {
         </View>
       </Card>
 
+      <SectionTitle>Діагностика</SectionTitle>
+      <Card>
+        <CommandButton command={vm.openLogsCommand} title="Журнал подій" variant="secondary" />
+        <CommandButton command={vm.simulateRejectionCommand} title="Необроблений виняток у фоновій задачі" variant="secondary" />
+        <CommandButton command={vm.simulateExceptionCommand} title="Необроблений виняток (JS)" variant="danger" />
+        <CommandButton command={vm.nativeCrashCommand} title="Нативний краш (Sentry)" variant="danger" />
+        {!vm.crashReportingEnabled && (
+          <Text style={{ color: c.textMuted, fontSize: 12 }}>
+            Задайте EXPO_PUBLIC_SENTRY_DSN у .env, щоб увімкнути збір крашів.
+          </Text>
+        )}
+      </Card>
     </ScrollView>
   );
 }

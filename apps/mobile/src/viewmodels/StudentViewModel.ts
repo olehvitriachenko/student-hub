@@ -7,6 +7,7 @@ import type { ILogger } from '../core/logging/Logger';
 import type { IStudentRepository } from '../data/StudentRepository';
 import { isExcellent, validateStudent, type Student } from '../models/Student';
 import type { AppLifecycleService } from '../services/AppLifecycleService';
+import type { Analytics } from '../services/CrashReporting';
 import { BACK_ROUTE, type INavigationService, type IQueryAttributable, type QueryParams } from '../services/NavigationService';
 import type { IPreferences } from '../services/Preferences';
 import type { SyncService } from '../services/SyncService';
@@ -29,6 +30,7 @@ interface Draft {
  *         отримання оновленого запису назад (query-параметри + Messenger).
  * Лаб. 3: OnAppearing → LoadCommand; збереження чернетки форми на Stopped.
  * Лаб. 4: CRUD через репозиторій, SyncCommand.
+ * Лаб. 5: логування ключових подій.
  */
 export class StudentViewModel extends ViewModelBase implements IQueryAttributable {
   // Інкапсульований об'єкт моделі, як `_student` у прикладі з лаб. 1.
@@ -52,6 +54,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     readonly sync: SyncService,
     private readonly prefs: IPreferences,
     lifecycle: AppLifecycleService,
+    private readonly analytics: Analytics,
     private readonly log: ILogger,
   ) {
     super();
@@ -165,6 +168,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
     };
     await this.repository.save(student);
     this.students.insert(0, student);
+    this.analytics.trackEvent('StudentAdded', { group: student.group });
 
     // Очистити поля вводу.
     this.fullName = '';
@@ -176,6 +180,7 @@ export class StudentViewModel extends ViewModelBase implements IQueryAttributabl
 
   private openDetails(student: Student): void {
     if (!student) return;
+    this.analytics.trackEvent('StudentOpened', { id: student.id });
     // Складний об'єкт передаємо словником параметрів (IQueryAttributable на приймачі).
     this.navigation.goTo(`/students/${student.id}`, { SelectedStudent: student });
   }

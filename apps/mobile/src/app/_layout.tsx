@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Sentry from '@sentry/react-native';
 import { Services, bootstrap, container } from '../AppServices';
 import { usePalette } from '../theme/theme';
 
@@ -12,8 +13,9 @@ import { usePalette } from '../theme/theme';
  *   /                → index.tsx           (список студентів, MainPage)
  *   /students/[id]   → students/[id].tsx   (StudentDetailPage, також deep link)
  *   /settings        → settings.tsx
+ *   /logs            → logs.tsx
  */
-export default function RootLayout() {
+function RootLayout() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const c = usePalette();
@@ -55,16 +57,20 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: 'Особистий кабінет' }} />
         <Stack.Screen name="students/[id]" options={{ title: 'Деталі студента' }} />
         <Stack.Screen name="settings" options={{ title: 'Налаштування' }} />
+        <Stack.Screen name="logs" options={{ title: 'Журнал подій' }} />
       </Stack>
     </>
   );
 }
 
-/** Відстежує поточний екран у стані сесії (IAppStateService). */
+/** Відстежує поточний екран: стан сесії (лаб. 3) + аналітика екранів (лаб. 5). */
 function RouteTracker() {
   const pathname = usePathname();
   useEffect(() => {
     container.get(Services.AppState).setCurrentRoute(pathname);
+    container.get(Services.Analytics).trackScreen(pathname);
   }, [pathname]);
   return null;
 }
+
+export default Sentry.wrap(RootLayout);
