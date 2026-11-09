@@ -28,7 +28,6 @@ export default function LoginPage() {
         autoComplete="email"
         textContentType="username"
         returnKeyType="next"
-        autoFocus
         {...bindText(vm, 'email')}
       />
       <Field

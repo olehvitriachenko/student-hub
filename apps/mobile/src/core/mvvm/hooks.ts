@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import type { ObservableObject } from './ObservableObject';
 import type { ICommand } from './Command';
 
@@ -13,14 +13,10 @@ export function useViewModel<T extends ObservableObject>(vm: T): T {
 
 /** Підписка на кілька observable-об'єктів одразу (наприклад, VM + її колекція). */
 export function useObservables(...objects: ObservableObject[]): void {
-  const subscribe = useCallback(
-    (cb: () => void) => {
-      const unsubs = objects.map((o) => o.subscribe(cb));
-      return () => unsubs.forEach((u) => u());
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    objects,
-  );
+  const subscribe = (cb: () => void) => {
+    const unsubs = objects.map((o) => o.subscribe(cb));
+    return () => unsubs.forEach((u) => u());
+  };
   const snapshot = () => objects.map((o) => o.getVersion()).join(':');
   useSyncExternalStore(subscribe, snapshot, snapshot);
 }

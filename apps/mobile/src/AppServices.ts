@@ -260,15 +260,13 @@ async function doBootstrap() {
   const chat = container.get(Services.Chat);
   const focus = container.get(Services.Focus);
   await focus.load();
-  auth.onSignOut(async () => {
-    chat.disconnect();
-    await focus.clear();
-    await reminders.disable();
-    await container.get(Services.EventRepository).clearAll();
-    await container.get(Services.AssignmentRepository).clearAll();
-    await container.get(Services.Schedule).clear();
-    await sync.reset();
-  });
+  auth.onSignOut(() => chat.disconnect());
+  auth.onSignOut(() => focus.clear());
+  auth.onSignOut(() => reminders.disable());
+  auth.onSignOut(() => container.get(Services.EventRepository).clearAll());
+  auth.onSignOut(() => container.get(Services.AssignmentRepository).clearAll());
+  auth.onSignOut(() => container.get(Services.Schedule).clear());
+  auth.onSignOut(() => sync.reset());
   auth.onSignIn(() => {
     void sync.sync();
     void reminders.enable();

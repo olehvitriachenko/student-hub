@@ -43,11 +43,11 @@ export function PressableScale({ style, children, scaleTo = 0.97, disabled, ...p
       {...props}
       disabled={disabled}
       onPressIn={(e) => {
-        scale.value = withTiming(scaleTo, PRESS);
+        scale.set(withTiming(scaleTo, PRESS));
         props.onPressIn?.(e);
       }}
       onPressOut={(e) => {
-        scale.value = withTiming(1, PRESS);
+        scale.set(withTiming(1, PRESS));
         props.onPressOut?.(e);
       }}
       style={[style, anim]}
@@ -80,7 +80,7 @@ export function Card({
   tone?: 'default' | 'ink';
 }) {
   const c = usePalette();
-  const base = [styles.card, { backgroundColor: tone === 'ink' ? c.ink : c.surface, shadowColor: c.shadow }, style];
+  const base = [styles.card, { backgroundColor: tone === 'ink' ? c.ink : c.surface, borderColor: c.border, borderWidth: 1, shadowColor: c.shadow }, style];
   if (!onPress) return <View style={base}>{children}</View>;
   return (
     <PressableScale onPress={onPress} scaleTo={0.98} style={base}>
@@ -289,10 +289,10 @@ export function Chip<P>({
         haptic.select();
         onPress();
       }}
-      style={[styles.chip, { backgroundColor: selected ? c.primary : c.surface, borderColor: selected ? c.primary : c.border }]}
+      style={[styles.chip, { backgroundColor: selected ? c.accentSoft : c.surface, borderColor: selected ? c.accent : c.border }]}
     >
-      {icon ? <Ionicons name={icon} size={15} color={selected ? c.primaryText : c.text} /> : null}
-      <Text style={{ color: selected ? c.primaryText : c.text, fontWeight: '600', fontSize: 14 }}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={15} color={selected ? c.accent : c.text} /> : null}
+      <Text style={{ color: selected ? c.accent : c.text, fontWeight: '600', fontSize: 14 }}>{label}</Text>
     </PressableScale>
   );
 }
@@ -338,6 +338,9 @@ export function MenuItem<P>({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.menuItem,
         !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border },
@@ -462,10 +465,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.md,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
+    shadowRadius: 12,
+    elevation: 1,
   },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   section: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },

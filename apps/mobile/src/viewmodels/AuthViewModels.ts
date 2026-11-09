@@ -1,7 +1,7 @@
 import { Command } from '../core/mvvm/Command';
 import { ViewModelBase } from '../core/mvvm/ViewModelBase';
 import type { ILogger } from '../core/logging/Logger';
-import { userMessage } from '../services/ApiClient';
+import { ApiError, userMessage } from '../services/ApiClient';
 import type { AuthService } from '../services/AuthService';
 import type { Analytics } from '../services/CrashReporting';
 import type { INavigationService } from '../services/NavigationService';
@@ -87,7 +87,7 @@ const STEP_TEXT: Record<RegisterStep, { title: string; subtitle: string; action:
 
 /**
  * Реєстрація у 3 кроки (візард): email → пароль → ПІБ і група.
- * Кожен крок валідується перед переходом; email перевіряється на сервері вже на першому кроці.
+ * Кроки перевіряються локально; унікальність email перевіряє сервер під час створення акаунта.
  */
 export class RegisterViewModel extends ViewModelBase {
   private readonly fields = { email: '', password: '', confirm: '', fullName: '', group: '' };
@@ -153,15 +153,10 @@ export class RegisterViewModel extends ViewModelBase {
     return this.register();
   }
 
-  private async submitEmail() {
+  private submitEmail() {
     const email = this.fields.email.trim();
     if (!EMAIL_RE.test(email)) return this.setError('Некоректний email');
-    try {
-      if (!(await this.auth.isEmailAvailable(email))) return this.setError('Цей email уже зареєстровано — увійдіть');
-      this.setStep(2);
-    } catch (e) {
-      this.setError(userMessage(e));
-    }
+    this.setStep(2);
   }
 
   private async register() {
@@ -172,7 +167,12 @@ export class RegisterViewModel extends ViewModelBase {
       this.analytics.trackEvent('SignUp', { group });
     } catch (e) {
       this.log.warn('Registration failed', { reason: userMessage(e) });
-      this.setError(userMessage(e));
+      if (e instanceof ApiError && e.status === 409) {
+        this.setStep(1);
+        this.setError('Цей email уже зареєстровано — увійдіть або вкажіть інший');
+      } else {
+        this.setError(userMessage(e));
+      }
     }
   }
 

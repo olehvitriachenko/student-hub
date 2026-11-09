@@ -33,8 +33,7 @@ export default function RegisterPage() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
-          autoFocus
-          returnKeyType="next"
+            returnKeyType="next"
           onSubmitEditing={() => vm.nextCommand.execute()}
           {...bindText(vm, 'email')}
         />

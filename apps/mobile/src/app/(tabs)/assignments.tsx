@@ -7,7 +7,7 @@ import { haptic } from '../../utils/haptics';
 import { Services } from '../../AppServices';
 import { useCommand, useObservables } from '../../core/mvvm/hooks';
 import { usePageViewModel } from '../../core/mvvm/usePageViewModel';
-import { Badge, Card, Chip, EmptyState, FadeInItem, Icon, PressableScale, ScreenHeader, Snackbar, Tag } from '../../components/ui';
+import { Badge, Card, Chip, EmptyState, FadeInItem, Icon, PressableScale, Snackbar, Tag } from '../../components/ui';
 import type { Assignment } from '../../models/Assignment';
 import { radius, spacing, TAB_BAR_SPACE, usePalette, usePastel } from '../../theme/theme';
 import { formatDate, relativeDue } from '../../utils/format';
@@ -27,7 +27,7 @@ export default function AssignmentsPage() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.background }}>
+    <View style={{ flex: 1, backgroundColor: c.background, paddingTop: insets.top }}>
       <Animated.FlatList
         data={vm.visible}
         keyExtractor={(a) => a.id}
@@ -37,7 +37,13 @@ export default function AssignmentsPage() {
         onRefresh={() => vm.refreshCommand.execute()}
         ListHeaderComponent={
           <View style={{ marginHorizontal: -spacing.lg, gap: spacing.lg, marginBottom: spacing.xs }}>
-            <ScreenHeader title="Завдання" subtitle="Дедлайни та оцінки" right={<SyncIndicator online={vm.sync.isOnline} syncing={vm.sync.isSyncing} pending={vm.sync.pendingCount} />} />
+            <View style={styles.header}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: c.textMuted, fontSize: 15, fontWeight: '500' }}>Дедлайни та оцінки</Text>
+                <Text style={{ color: c.text, fontSize: 34, fontWeight: '800', letterSpacing: -1 }}>Завдання</Text>
+              </View>
+              <SyncIndicator online={vm.sync.isOnline} syncing={vm.sync.isSyncing} pending={vm.sync.pendingCount} />
+            </View>
             <View style={styles.stats}>
               <Stat value={vm.activeCount} label="активних" tone="ink" />
               <Stat value={vm.overdueCount} label="прострочено" tone={vm.overdueCount ? 'danger' : 'plain'} />
@@ -73,9 +79,9 @@ export default function AssignmentsPage() {
 
 function Stat({ value, label, tone }: { value: number; label: string; tone: 'ink' | 'danger' | 'plain' }) {
   const c = usePalette();
-  const bg = tone === 'ink' ? c.ink : tone === 'danger' ? c.dangerBg : c.surface;
-  const fg = tone === 'ink' ? c.inkText : tone === 'danger' ? c.danger : c.text;
-  const sub = tone === 'ink' ? c.inkMuted : tone === 'danger' ? c.danger : c.textMuted;
+  const bg = tone === 'ink' ? c.accentSoft : tone === 'danger' ? c.dangerBg : c.surface;
+  const fg = tone === 'ink' ? c.accent : tone === 'danger' ? c.danger : c.text;
+  const sub = tone === 'ink' ? c.textMuted : tone === 'danger' ? c.danger : c.textMuted;
   return (
     <View style={[styles.stat, { backgroundColor: bg }]}>
       <Text style={{ color: fg, fontSize: 28, fontWeight: '800', letterSpacing: -1 }}>{value}</Text>
@@ -167,7 +173,7 @@ function AssignmentCard({ vm, item }: { vm: AssignmentsViewModel; item: Assignme
           }
         }}
       >
-        <Card onPress={open.onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Card onPress={open.onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border }}>
           <CheckCircle
             done={item.done}
             onPress={() => {
@@ -219,6 +225,7 @@ function SyncIndicator({ online, syncing, pending }: { online: boolean; syncing:
 }
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.md },
   stats: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
   stat: { flex: 1, borderRadius: radius.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, gap: 0 },
   check: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

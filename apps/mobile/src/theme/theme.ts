@@ -6,12 +6,12 @@ import { useColorScheme } from 'react-native';
  * і пастельні кольори предметів.
  */
 const light = {
-  background: '#F6F3EE',
+  background: '#F2EAE3',
   surface: '#FFFFFF',
-  surfaceAlt: '#EFEBE4',
+  surfaceAlt: '#F4EFEB',
   text: '#16151C',
-  textMuted: '#7D7A84',
-  border: '#E6E1D8',
+  textMuted: '#626A77',
+  border: '#E7DDD6',
   /** Основні кнопки, активні чіпи, темні картки. */
   primary: '#16151C',
   primaryText: '#FFFFFF',
@@ -26,9 +26,9 @@ const light = {
   warningBg: '#FFF0D4',
   danger: '#E0443A',
   dangerBg: '#FDE4E1',
-  tabBar: '#16151C',
-  tabInactive: '#8D8A96',
-  shadow: 'rgba(40, 30, 20, 0.10)',
+  tabBar: '#FFFFFF',
+  tabInactive: '#626A77',
+  shadow: 'rgba(30, 40, 55, 0.06)',
   /** Темна «геро»-картка. */
   ink: '#16151C',
   inkText: '#FFFFFF',
@@ -36,17 +36,17 @@ const light = {
 };
 
 const dark: typeof light = {
-  background: '#0E0D12',
-  surface: '#18171E',
-  surfaceAlt: '#23222B',
-  text: '#F4F2EE',
-  textMuted: '#8E8B97',
-  border: '#2A2932',
+  background: '#121116',
+  surface: '#2B2830',
+  surfaceAlt: '#3A353E',
+  text: '#FAF7F5',
+  textMuted: '#C5BEC4',
+  border: '#554D56',
   primary: '#F4F2EE',
   primaryText: '#0E0D12',
-  primarySoft: '#23222B',
+  primarySoft: '#3A353E',
   accent: '#FF7D52',
-  accentSoft: '#3A231B',
+  accentSoft: '#543025',
   accentText: '#0E0D12',
   success: '#4ADE80',
   successBg: '#15301F',
@@ -54,12 +54,12 @@ const dark: typeof light = {
   warningBg: '#33280F',
   danger: '#F87171',
   dangerBg: '#3A1C1C',
-  tabBar: '#23222B',
-  tabInactive: '#8E8B97',
+  tabBar: '#302C34',
+  tabInactive: '#C5BEC4',
   shadow: 'rgba(0, 0, 0, 0.5)',
-  ink: '#23222B',
+  ink: '#3A353E',
   inkText: '#F4F2EE',
-  inkMuted: '#9E9BA8',
+  inkMuted: '#C5BEC4',
 };
 
 export type Palette = typeof light;

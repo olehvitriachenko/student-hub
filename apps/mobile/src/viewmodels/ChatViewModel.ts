@@ -1,15 +1,15 @@
 import { Command } from '../core/mvvm/Command';
 import { ViewModelBase } from '../core/mvvm/ViewModelBase';
 import type { ChatMessage } from '../models/ChatMessage';
+import type { AuthService } from '../services/AuthService';
+import type { ChatService } from '../services/ChatService';
+import { formatDate, startOfDay } from '../utils/format';
 
 export interface ReactionChip {
   emoji: string;
   count: number;
   mine: boolean;
 }
-import type { AuthService } from '../services/AuthService';
-import type { ChatService } from '../services/ChatService';
-import { formatDate, startOfDay } from '../utils/format';
 
 export type ChatRow =
   | { kind: 'day'; key: string; label: string }

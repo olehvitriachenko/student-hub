@@ -132,6 +132,12 @@ export class ScheduleViewModel extends ViewModelBase {
     return this.itemsOf(this._selectedDate);
   }
 
+  /** Найближча пара лише для сьогоднішнього дня. */
+  get nextLessonKey(): string | null {
+    if (this._selectedDate !== startOfDay(this._now)) return null;
+    return this.items.find((item) => item.kind === 'lesson' && this.itemState(item) === 'upcoming')?.key ?? null;
+  }
+
   itemState(item: TimelineItem): ItemState {
     const today = startOfDay(this._now);
     if (this._selectedDate < today) return 'past';

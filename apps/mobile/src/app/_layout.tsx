@@ -22,15 +22,19 @@ import { usePalette } from '../theme/theme';
  * Stack.Protected сам перемикає групи маршрутів, коли змінюється AuthService.isAuthenticated.
  */
 function RootLayout() {
-  const [ready, setReady] = useState(false);
+  const [readyContainer, setReadyContainer] = useState<typeof container | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const c = usePalette();
 
   useEffect(() => {
+    let active = true;
     bootstrap()
-      .then(() => setReady(true))
-      .catch((e: Error) => setError(e));
-  }, []);
+      .then(() => { if (active) setReadyContainer(container); })
+      .catch((e: Error) => { if (active) setError(e); });
+    return () => { active = false; };
+    // Fast Refresh can replace the container while preserving component state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [container]);
 
   if (error) {
     return (
@@ -41,7 +45,7 @@ function RootLayout() {
     );
   }
 
-  if (!ready) {
+  if (readyContainer !== container) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background }}>
         <ActivityIndicator color={c.primary} />
@@ -82,6 +86,7 @@ function AppNavigator({ auth: authService }: { auth: AuthService }) {
           <Stack.Screen name="assignment/[id]" options={{ title: 'Завдання' }} />
           <Stack.Screen name="event/[id]" options={{ title: 'Подія' }} />
           <Stack.Screen name="focus/[id]" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="preferences" options={{ title: 'Налаштування' }} />
           <Stack.Screen name="settings" options={{ title: 'Синхронізація та діагностика' }} />
           <Stack.Screen name="logs" options={{ title: 'Журнал подій' }} />
         </Stack.Protected>

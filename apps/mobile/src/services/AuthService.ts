@@ -17,6 +17,8 @@ const USER_KEY = 'auth.user';
  */
 export class AuthService extends ObservableObject {
   private _user: User | null = null;
+  private signOutPromise: Promise<void> | null = null;
+  private sessionVersion = 0;
   private readonly signOutHandlers = new Set<() => Promise<void> | void>();
   private readonly signInHandlers = new Set<() => void>();
 
@@ -82,9 +84,12 @@ export class AuthService extends ObservableObject {
   }
 
   async refreshProfile(): Promise<void> {
+    const version = this.sessionVersion;
     try {
       const user = await this.api.me();
+      if (version !== this.sessionVersion) return;
       await this.prefs.setJson(USER_KEY, user);
+      if (version !== this.sessionVersion) return;
       this.setUser(user);
     } catch (e) {
       if (!(e instanceof ApiError)) this.log.debug('Profile refresh skipped: offline');
@@ -92,17 +97,30 @@ export class AuthService extends ObservableObject {
   }
 
   /** @param notifyServer false — коли сервер уже відхилив токен (401). */
-  async signOut(notifyServer = true): Promise<void> {
-    if (notifyServer) await this.api.logout().catch(() => undefined);
-    this.api.setToken(null);
+  signOut(notifyServer = true): Promise<void> {
+    if (this.signOutPromise) return this.signOutPromise;
+    this.sessionVersion++;
+    // Start the request while the token is still attached, but do not block local sign-out on the network.
+    if (notifyServer) void this.api.logout().catch(() => undefined);
+    const operation = this.finishSignOut();
+    this.signOutPromise = operation.finally(() => { this.signOutPromise = null; });
+    return this.signOutPromise;
+  }
+
+  private async finishSignOut(): Promise<void> {
+    // Keep the user on this screen if credentials could not be removed, so they can retry.
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await this.prefs.remove(USER_KEY);
-    for (const h of this.signOutHandlers) await h();
+    this.api.setToken(null);
+    for (const h of this.signOutHandlers) {
+      try { await h(); } catch (e) { this.log.warn('Sign-out cleanup failed', { reason: String(e) }); }
+    }
     this.setUser(null);
     this.log.info('Signed out');
   }
 
   private async applyAuth({ token, user }: AuthResponse) {
+    this.sessionVersion++;
     await SecureStore.setItemAsync(TOKEN_KEY, token);
     await this.prefs.setJson(USER_KEY, user);
     this.api.setToken(token);

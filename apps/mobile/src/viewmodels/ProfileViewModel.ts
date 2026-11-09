@@ -67,7 +67,14 @@ export class ProfileViewModel extends ViewModelBase {
     this.syncCommand = new Command(() => sync.sync(), () => !sync.isSyncing);
     this.openDiagnosticsCommand = new Command(() => navigation.goTo('/settings'));
     this.openLogsCommand = new Command(() => navigation.goTo('/logs'));
-    this.logoutCommand = new Command(() => auth.signOut());
+    this.logoutCommand = new Command(async () => {
+      this.setError(null);
+      try { await auth.signOut(); }
+      catch (e) {
+        this.log.warn('Sign out failed', { reason: String(e) });
+        this.setError('Не вдалося завершити вихід. Спробуйте ще раз.');
+      }
+    });
     this.toggleReminderCommand = new Command((key) => reminders.update({ [key]: !reminders.settings[key] }));
     this.setLeadCommand = new Command<number>((m) => reminders.update({ lessonLeadMin: m }));
     this.testNotificationCommand = new Command(() => reminders.sendTest());
