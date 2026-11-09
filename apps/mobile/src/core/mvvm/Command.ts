@@ -10,6 +10,8 @@ export interface ICommand<TParam = void> {
   canExecute(param: TParam): boolean;
   subscribe(handler: () => void): () => void;
   getVersion(): number;
+  /** true, поки виконується асинхронна дія. */
+  readonly isRunning?: boolean;
 }
 
 type MaybePromise = void | Promise<void>;

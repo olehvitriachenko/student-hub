@@ -9,7 +9,7 @@ import type { INavigationService } from '../services/NavigationService';
 import type { SyncService } from '../services/SyncService';
 import type { ThemePreference, ThemeService } from '../services/ThemeService';
 
-/** Екран налаштувань: тема (лаб. 3), стан синхронізації (лаб. 4), діагностика (лаб. 5). */
+/** Екран «Синхронізація та діагностика»: стан черги (лаб. 4), життєвий цикл (лаб. 3), діагностика (лаб. 5). */
 export class SettingsViewModel extends ViewModelBase {
   readonly setThemeCommand: Command<ThemePreference>;
   readonly syncNowCommand: Command;

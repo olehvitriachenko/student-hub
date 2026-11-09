@@ -28,7 +28,13 @@
       "expo-status-bar",
       "expo-sqlite",
       "expo-secure-store",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF6B3D"
+        }
+      ]
     ],
     "scheme": "studenthub",
     "experiments": {

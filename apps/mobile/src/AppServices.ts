@@ -5,18 +5,30 @@ import { RollingFileSink } from './core/logging/FileSink';
 import { installGlobalErrorHandlers } from './core/logging/globalErrorHandler';
 import { Messenger } from './core/mvvm/Messenger';
 import { openDatabase } from './data/database';
-import { SqliteStudentRepository, type IStudentRepository } from './data/StudentRepository';
+import { SqliteAssignmentRepository } from './data/AssignmentRepository';
+import { SqliteEventRepository } from './data/EventRepository';
 import { ApiClient } from './services/ApiClient';
 import { AppLifecycleService } from './services/AppLifecycleService';
 import { AppStateService } from './services/AppStateService';
+import { AuthService } from './services/AuthService';
+import { ChatService } from './services/ChatService';
+import { FocusService } from './services/FocusService';
 import { Analytics, SentrySink, initCrashReporting } from './services/CrashReporting';
 import { AesCryptoService, type ICryptoService } from './services/CryptoService';
 import { ExpoRouterNavigationService, type INavigationService } from './services/NavigationService';
 import { AsyncStoragePreferences, type IPreferences } from './services/Preferences';
+import { ReminderService } from './services/ReminderService';
+import { ScheduleService } from './services/ScheduleService';
 import { SyncService } from './services/SyncService';
 import { ThemeService } from './services/ThemeService';
-import { StudentViewModel } from './viewmodels/StudentViewModel';
-import { StudentDetailViewModel } from './viewmodels/StudentDetailViewModel';
+import { LoginViewModel, RegisterViewModel, WelcomeViewModel } from './viewmodels/AuthViewModels';
+import { ScheduleViewModel } from './viewmodels/ScheduleViewModel';
+import { AssignmentsViewModel } from './viewmodels/AssignmentsViewModel';
+import { AssignmentEditViewModel } from './viewmodels/AssignmentEditViewModel';
+import { EventEditViewModel } from './viewmodels/EventEditViewModel';
+import { ProfileViewModel } from './viewmodels/ProfileViewModel';
+import { ChatViewModel } from './viewmodels/ChatViewModel';
+import { FocusViewModel } from './viewmodels/FocusViewModel';
 import { SettingsViewModel } from './viewmodels/SettingsViewModel';
 import { LogsViewModel } from './viewmodels/LogsViewModel';
 
@@ -36,12 +48,26 @@ export const Services = {
   Lifecycle: new ServiceKey<AppLifecycleService>('AppLifecycleService'),
   Theme: new ServiceKey<ThemeService>('ThemeService'),
   Api: new ServiceKey<ApiClient>('ApiClient'),
-  StudentRepository: new ServiceKey<SqliteStudentRepository>('IStudentRepository'),
+  Auth: new ServiceKey<AuthService>('AuthService'),
+  Schedule: new ServiceKey<ScheduleService>('ScheduleService'),
+  AssignmentRepository: new ServiceKey<SqliteAssignmentRepository>('IAssignmentRepository'),
+  EventRepository: new ServiceKey<SqliteEventRepository>('IEventRepository'),
+  Reminders: new ServiceKey<ReminderService>('ReminderService'),
   Sync: new ServiceKey<SyncService>('SyncService'),
+  Chat: new ServiceKey<ChatService>('ChatService'),
+  Focus: new ServiceKey<FocusService>('FocusService'),
   Analytics: new ServiceKey<Analytics>('Analytics'),
   // ViewModels — transient: новий екземпляр на кожну сторінку
-  StudentViewModel: new ServiceKey<StudentViewModel>('StudentViewModel'),
-  StudentDetailViewModel: new ServiceKey<StudentDetailViewModel>('StudentDetailViewModel'),
+  WelcomeViewModel: new ServiceKey<WelcomeViewModel>('WelcomeViewModel'),
+  LoginViewModel: new ServiceKey<LoginViewModel>('LoginViewModel'),
+  RegisterViewModel: new ServiceKey<RegisterViewModel>('RegisterViewModel'),
+  ScheduleViewModel: new ServiceKey<ScheduleViewModel>('ScheduleViewModel'),
+  AssignmentsViewModel: new ServiceKey<AssignmentsViewModel>('AssignmentsViewModel'),
+  AssignmentEditViewModel: new ServiceKey<AssignmentEditViewModel>('AssignmentEditViewModel'),
+  ProfileViewModel: new ServiceKey<ProfileViewModel>('ProfileViewModel'),
+  EventEditViewModel: new ServiceKey<EventEditViewModel>('EventEditViewModel'),
+  ChatViewModel: new ServiceKey<ChatViewModel>('ChatViewModel'),
+  FocusViewModel: new ServiceKey<FocusViewModel>('FocusViewModel'),
   SettingsViewModel: new ServiceKey<SettingsViewModel>('SettingsViewModel'),
   LogsViewModel: new ServiceKey<LogsViewModel>('LogsViewModel'),
 } as const;
@@ -82,51 +108,134 @@ async function doBootstrap() {
     .addSingleton(Services.Lifecycle, () => new AppLifecycleService(log('AppLifecycle')))
     .addSingleton(Services.Theme, (c) => new ThemeService(c.get(Services.Preferences), log('ThemeService')))
     .addSingleton(Services.Api, () => new ApiClient())
+    .addSingleton(Services.Auth, (c) => new AuthService(c.get(Services.Api), c.get(Services.Preferences), log('Auth')))
+    .addSingleton(Services.Schedule, (c) => new ScheduleService(c.get(Services.Api), c.get(Services.Preferences), log('Schedule'), c.get(Services.Messenger)))
     .addSingleton(
-      Services.StudentRepository,
-      (c) => new SqliteStudentRepository(c.get(Services.Database), c.get(Services.Crypto), log('StudentRepository')),
+      Services.AssignmentRepository,
+      (c) => new SqliteAssignmentRepository(c.get(Services.Database), c.get(Services.Crypto), log('AssignmentRepository')),
+    )
+    .addSingleton(
+      Services.EventRepository,
+      (c) => new SqliteEventRepository(c.get(Services.Database), c.get(Services.Crypto), log('EventRepository')),
+    )
+    .addSingleton(
+      Services.Reminders,
+      (c) =>
+        new ReminderService(
+          c.get(Services.Schedule),
+          c.get(Services.AssignmentRepository),
+          c.get(Services.EventRepository),
+          c.get(Services.Preferences),
+          c.get(Services.Navigation),
+          c.get(Services.Messenger),
+          log('Reminders'),
+        ),
     )
     .addSingleton(
       Services.Sync,
       (c) =>
         new SyncService(
-          c.get(Services.StudentRepository),
+          c.get(Services.AssignmentRepository),
           c.get(Services.Api),
           c.get(Services.Preferences),
           c.get(Services.Messenger),
           log('SyncService'),
+          () => c.get(Services.Auth).isAuthenticated,
         ),
     )
+    .addSingleton(Services.Chat, (c) => new ChatService(c.get(Services.Api), log('Chat')))
+    .addSingleton(Services.Focus, (c) => new FocusService(c.get(Services.Preferences), log('Focus')))
+    .addTransient(
+      Services.FocusViewModel,
+      (c) =>
+        new FocusViewModel(
+          c.get(Services.Focus),
+          c.get(Services.Reminders),
+          c.get(Services.AssignmentRepository),
+          c.get(Services.Navigation),
+          c.get(Services.Analytics),
+          log('FocusViewModel'),
+        ),
+    )
+    .addTransient(Services.ChatViewModel, (c) => new ChatViewModel(c.get(Services.Chat), c.get(Services.Auth)))
     .addSingleton(Services.Analytics, () => {
       const a = log('Analytics');
       return new Analytics((name, props) => a.info(`Event: ${name}`, props));
     })
+    .addTransient(Services.WelcomeViewModel, (c) => new WelcomeViewModel(c.get(Services.Navigation)))
     .addTransient(
-      Services.StudentViewModel,
+      Services.LoginViewModel,
+      (c) => new LoginViewModel(c.get(Services.Auth), c.get(Services.Navigation), c.get(Services.Analytics), log('LoginViewModel')),
+    )
+    .addTransient(
+      Services.RegisterViewModel,
       (c) =>
-        new StudentViewModel(
-          c.get(Services.StudentRepository) as IStudentRepository,
+        new RegisterViewModel(c.get(Services.Auth), c.get(Services.Navigation), c.get(Services.Analytics), log('RegisterViewModel')),
+    )
+    .addTransient(
+      Services.ScheduleViewModel,
+      (c) =>
+        new ScheduleViewModel(
+          c.get(Services.Schedule),
+          c.get(Services.EventRepository),
+          c.get(Services.Auth),
           c.get(Services.Navigation),
           c.get(Services.Messenger),
-          c.get(Services.Sync),
-          c.get(Services.Preferences),
-          c.get(Services.Lifecycle),
-          c.get(Services.Analytics),
-          log('StudentViewModel'),
+          log('ScheduleViewModel'),
         ),
     )
     .addTransient(
-      Services.StudentDetailViewModel,
+      Services.AssignmentsViewModel,
       (c) =>
-        new StudentDetailViewModel(
-          c.get(Services.StudentRepository) as IStudentRepository,
+        new AssignmentsViewModel(
+          c.get(Services.AssignmentRepository),
+          c.get(Services.Sync),
+          c.get(Services.Messenger),
+          c.get(Services.Navigation),
+          c.get(Services.Analytics),
+          log('AssignmentsViewModel'),
+        ),
+    )
+    .addTransient(
+      Services.AssignmentEditViewModel,
+      (c) =>
+        new AssignmentEditViewModel(
+          c.get(Services.AssignmentRepository),
           c.get(Services.Navigation),
           c.get(Services.Messenger),
           c.get(Services.Sync),
+          c.get(Services.Schedule),
           c.get(Services.Preferences),
           c.get(Services.Lifecycle),
-          c.get(Services.AppState),
-          log('StudentDetailViewModel'),
+          c.get(Services.Analytics),
+          log('AssignmentEditViewModel'),
+        ),
+    )
+    .addTransient(
+      Services.ProfileViewModel,
+      (c) =>
+        new ProfileViewModel(
+          c.get(Services.Auth),
+          c.get(Services.AssignmentRepository),
+          c.get(Services.Sync),
+          c.get(Services.Theme),
+          c.get(Services.Reminders),
+          c.get(Services.Focus),
+          c.get(Services.Schedule),
+          c.get(Services.Navigation),
+          c.get(Services.Messenger),
+          log('ProfileViewModel'),
+        ),
+    )
+    .addTransient(
+      Services.EventEditViewModel,
+      (c) =>
+        new EventEditViewModel(
+          c.get(Services.EventRepository),
+          c.get(Services.Navigation),
+          c.get(Services.Messenger),
+          c.get(Services.Analytics),
+          log('EventEditViewModel'),
         ),
     )
     .addTransient(
@@ -143,10 +252,38 @@ async function doBootstrap() {
     )
     .addTransient(Services.LogsViewModel, (c) => new LogsViewModel(c.get(Services.FileSink), log('LogsViewModel')));
 
-  // 4. Запуск фонових сервісів.
+  // 4. Сесія: при виході стираємо локальні дані користувача, при вході — синхронізуємо.
+  const auth = container.get(Services.Auth);
+  const sync = container.get(Services.Sync);
+  const reminders = container.get(Services.Reminders);
+  await reminders.init();
+  const chat = container.get(Services.Chat);
+  const focus = container.get(Services.Focus);
+  await focus.load();
+  auth.onSignOut(async () => {
+    chat.disconnect();
+    await focus.clear();
+    await reminders.disable();
+    await container.get(Services.EventRepository).clearAll();
+    await container.get(Services.AssignmentRepository).clearAll();
+    await container.get(Services.Schedule).clear();
+    await sync.reset();
+  });
+  auth.onSignIn(() => {
+    void sync.sync();
+    void reminders.enable();
+    chat.connect();
+  });
+  await auth.restore();
+  if (auth.isAuthenticated) {
+    void reminders.enable();
+    chat.connect();
+  }
+
+  // 5. Запуск фонових сервісів.
   await container.get(Services.Theme).load();
   container.get(Services.Lifecycle).start();
-  container.get(Services.Sync).start();
+  sync.start();
 
   // Скидаємо лог на диск, коли застосунок іде у фон (Stopped) — далі ОС може його вбити.
   container.get(Services.Lifecycle).on((e) => (e === 'Stopped' ? loggerFactory.flush() : undefined));

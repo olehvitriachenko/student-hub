@@ -34,6 +34,42 @@ const MIGRATIONS: { version: number; sql: string }[] = [
         attempts    INTEGER NOT NULL DEFAULT 0
       );`,
   },
+  {
+    // v3: акаунти. Дані тепер належать користувачу — локально кешуємо його завдання.
+    // Стара таблиця students більше не використовується; черга від неї очищається.
+    version: 3,
+    sql: `
+      DELETE FROM sync_queue;
+      DROP TABLE IF EXISTS students;
+      CREATE TABLE IF NOT EXISTS assignments (
+        id             TEXT PRIMARY KEY NOT NULL,
+        title          TEXT NOT NULL,
+        subject        TEXT NOT NULL,
+        descriptionEnc TEXT NOT NULL DEFAULT '',
+        dueAt          INTEGER NOT NULL,
+        done           INTEGER NOT NULL DEFAULT 0,
+        grade          REAL,
+        updatedAt      INTEGER NOT NULL,
+        deleted        INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_assignments_due ON assignments(deleted, done, dueAt);`,
+  },
+  {
+    // v4: особисті події планувальника (лише локально, з нагадуваннями).
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS events (
+        id          TEXT PRIMARY KEY NOT NULL,
+        title       TEXT NOT NULL,
+        category    TEXT NOT NULL,
+        startAt     INTEGER NOT NULL,
+        durationMin INTEGER NOT NULL,
+        noteEnc     TEXT NOT NULL DEFAULT '',
+        remind      INTEGER NOT NULL DEFAULT 1,
+        createdAt   INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_events_start ON events(startAt);`,
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

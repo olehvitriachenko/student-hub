@@ -2,13 +2,16 @@
  * Аналог WeakReferenceMessenger (CommunityToolkit.Mvvm).
  * Дозволяє ViewModel'ям різних сторінок обмінюватись повідомленнями без прямих посилань.
  */
-import type { Student } from '../../models/Student';
+import type { Assignment } from '../../models/Assignment';
+import type { Schedule } from '../../models/Lesson';
 
 /** Реєстр усіх повідомлень застосунку: ключ — назва, значення — тип payload. */
 export interface Messages {
-  StudentUpdated: Student;
-  StudentDeleted: { id: string };
-  StudentsSynced: { pulled: number; pushed: number };
+  AssignmentSaved: Assignment;
+  AssignmentDeleted: { id: string };
+  AssignmentsSynced: { pulled: number; pushed: number };
+  EventsChanged: { id: string };
+  ScheduleLoaded: Schedule;
 }
 
 type Handler<K extends keyof Messages> = (payload: Messages[K]) => void;

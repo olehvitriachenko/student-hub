@@ -2,18 +2,24 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Sentry from '@sentry/react-native';
 import { Services, bootstrap, container } from '../AppServices';
+import { useViewModel } from '../core/mvvm/hooks';
+import type { AuthService } from '../services/AuthService';
+import { crashReportingEnabled } from '../services/CrashReporting';
 import { usePalette } from '../theme/theme';
 
 /**
  * Кореневий layout — аналог AppShell (лаб. 2).
  *
  * Маршрути Expo Router реєструються файлами в src/app (аналог Routing.RegisterRoute):
- *   /                → index.tsx           (список студентів, MainPage)
- *   /students/[id]   → students/[id].tsx   (StudentDetailPage, також deep link)
- *   /settings        → settings.tsx
- *   /logs            → logs.tsx
+ *   (auth)/login, (auth)/register   — вхід і реєстрація (лише для гостей)
+ *   (tabs)/index | assignments | profile — нижні вкладки: Розклад, Завдання, Профіль
+ *   /assignment/[id], /event/[id]    — завдання та події планувальника, також deep link
+ *   /settings, /logs                 — синхронізація та діагностика (лаб. 4–5)
+ *
+ * Stack.Protected сам перемикає групи маршрутів, коли змінюється AuthService.isAuthenticated.
  */
 function RootLayout() {
   const [ready, setReady] = useState(false);
@@ -44,20 +50,41 @@ function RootLayout() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppNavigator auth={container.get(Services.Auth)} />
+    </GestureHandlerRootView>
+  );
+}
+
+function AppNavigator({ auth: authService }: { auth: AuthService }) {
+  const auth = useViewModel(authService);
+  const c = usePalette();
+
+  return (
     <>
       <RouteTracker />
       <StatusBar style="auto" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: c.surface },
+          headerStyle: { backgroundColor: c.background },
+          headerShadowVisible: false,
           headerTintColor: c.text,
+          headerTitleStyle: { color: c.text, fontWeight: '700' },
+          headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: c.background },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Особистий кабінет' }} />
-        <Stack.Screen name="students/[id]" options={{ title: 'Деталі студента' }} />
-        <Stack.Screen name="settings" options={{ title: 'Налаштування' }} />
-        <Stack.Screen name="logs" options={{ title: 'Журнал подій' }} />
+        <Stack.Protected guard={!auth.isAuthenticated}>
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        </Stack.Protected>
+        <Stack.Protected guard={auth.isAuthenticated}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="assignment/[id]" options={{ title: 'Завдання' }} />
+          <Stack.Screen name="event/[id]" options={{ title: 'Подія' }} />
+          <Stack.Screen name="focus/[id]" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="settings" options={{ title: 'Синхронізація та діагностика' }} />
+          <Stack.Screen name="logs" options={{ title: 'Журнал подій' }} />
+        </Stack.Protected>
       </Stack>
     </>
   );
@@ -73,4 +100,5 @@ function RouteTracker() {
   return null;
 }
 
-export default Sentry.wrap(RootLayout);
+// Sentry.wrap має сенс лише коли Sentry ініціалізовано (задано EXPO_PUBLIC_SENTRY_DSN).
+export default crashReportingEnabled ? Sentry.wrap(RootLayout) : RootLayout;

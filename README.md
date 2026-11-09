@@ -1,6 +1,6 @@
 # Student Hub — «Особистий кабінет студента»
 
-Мобільний застосунок на **React Native (Expo SDK 58, Expo Router)** з бекендом на **Fastify**.
+Мобільний застосунок на **React Native (Expo SDK 58, Expo Router)** з бекендом на **Fastify**: акаунти (Argon2), розклад групи, завдання з офлайн-синхронізацією, планувальник подій і нагадування.
 Наскрізний проєкт для лабораторних робіт 1–5 з дисципліни «Мобільна розробка» (патерн **MVVM**).
 Оригінальні завдання написані під .NET MAUI; тут кожне поняття MAUI реалізовано його відповідником у RN/TypeScript.
 
@@ -45,14 +45,14 @@ npm test                     # інтеграційні тести API (node:tes
 | `WeakReferenceMessenger` | `Messenger` | `src/core/mvvm/Messenger.ts` |
 | `AppShell`, `Routing.RegisterRoute` | файлові маршрути Expo Router | `src/app/_layout.tsx` |
 | `Shell.Current.GoToAsync(route, params)` | `INavigationService.goTo` | `src/services/NavigationService.ts` |
-| `IQueryAttributable` / `[QueryProperty]` | `applyQueryAttributes` / `useLocalSearchParams` | `src/viewmodels/StudentDetailViewModel.ts` |
+| `IQueryAttributable` / `[QueryProperty]` | `applyQueryAttributes` / `useLocalSearchParams` | `src/viewmodels/AssignmentEditViewModel.ts` |
 | `MauiProgram.cs`, `AddSingleton/AddTransient` | `ServiceContainer` | `src/AppServices.ts`, `src/core/di/ServiceContainer.ts` |
 | `Window.Stopped/Resumed/...` | `AppLifecycleService` (`AppState`) | `src/services/AppLifecycleService.ts` |
 | `OnAppearing/OnDisappearing` | `useFocusEffect` → `vm.onAppearing()` | `src/core/mvvm/usePageViewModel.ts` |
 | `Preferences` | `AsyncStoragePreferences` | `src/services/Preferences.ts` |
 | `UserAppTheme` | `ThemeService` (`Appearance.setColorScheme`) | `src/services/ThemeService.ts` |
-| App Links / deep link | схема `studenthub://students/<id>` | `app.json`, `src/app/students/[id].tsx` |
-| `sqlite-net-pcl`, репозиторій | `expo-sqlite`, `SqliteStudentRepository` | `src/data/` |
+| App Links / deep link | `studenthub://assignment/<id>`, `studenthub://event/<id>` | `app.json`, `src/app/assignment/[id].tsx` |
+| `sqlite-net-pcl`, репозиторій | `expo-sqlite`, `SqliteAssignmentRepository`, `SqliteEventRepository` | `src/data/` |
 | `PRAGMA user_version` міграції | `MIGRATIONS` | `src/data/database.ts` |
 | SyncQueue + `HttpClient` | `sync_queue` + `SyncService` + `ApiClient` | `src/services/SyncService.ts` |
 | AES-шифрування поля | `AesCryptoService` (ключ у SecureStore) | `src/services/CryptoService.ts` |
@@ -60,7 +60,25 @@ npm test                     # інтеграційні тести API (node:tes
 | `AppDomain.UnhandledException` / `UnobservedTaskException` | `ErrorUtils.setGlobalHandler` / Hermes rejection tracker | `src/core/logging/globalErrorHandler.ts` |
 | App Center Crashes / Analytics | Sentry | `src/services/CrashReporting.ts` |
 
+## Застосунок (гілка `main`)
+
+- **Головний екран → вхід / реєстрація в 3 кроки** (email з перевіркою, чи він вільний → пароль із чек-листом вимог → ПІБ і група). Паролі на сервері — Argon2id, сесійний токен у SecureStore.
+- **Розклад**: тиждень Пн–Нд із гортанням, картка «Зараз / Далі», пари групи + власні події в одній стрічці. Розклад змокано на сервері (детермінований для кожної групи) і кешується офлайн.
+- **Планувальник подій**: категорії, дата/час/тривалість, нотатка (шифрується), нагадування.
+- **Завдання**: фільтри, відмітка «виконано», дедлайни й оцінки, offline-first синхронізація з API.
+- **Нагадування** (`expo-notifications`): за N хв до пари, напередодні дедлайну, за 15 хв до події; тестове сповіщення в профілі. У Expo Go працюють локальні сповіщення; віддалені push потребують development build.
+- **Чат групи** (WebSocket): повідомлення в реальному часі, «друкує…», лічильник онлайн, історія, бейдж непрочитаних на вкладці, автоперепідключення; **реакції** на довге натискання (синхронізуються між учасниками).
+- **Свайпи на завданнях**: → «виконано», ← «Фокус» / «Видалити» з плашкою «Скасувати» (видалення фіксується через 4 с).
+- **Фокус-таймер (Pomodoro)**: кільце прогресу на SVG + reanimated, 15/25/50 хв і перерва, сповіщення про кінець сесії у фоні, облік хвилин фокусу по кожному завданню.
+- **Графік оцінок за предметами** і статистика фокусу в профілі; свайп по стрічці розкладу перемикає день; тактильний відгук (haptics) на діях.
+- **Профіль**: студентський, прогрес семестру, налаштування нагадувань, тема, вихід.
+
+Гілки `lab1`…`lab5` зберігають стан проєкту після кожної лабораторної (до редизайну).
+
 ## Що реалізовано за лабораторними
+
+> Описи нижче відповідають гілкам `lab1`…`lab5`. У `main` ті самі механізми застосовано до завдань (`Assignment`) замість студентів.
+
 
 **Лаб. 1 — MVVM і Data Binding.** Модель `Student` без залежностей від UI. `StudentViewModel` з властивостями, що сповіщають про зміни; обчислювані `greeting` (OneWay) і `isExcellent` (зелений колір при балі ≥ 4.0). `AddStudentCommand` блокує кнопку, поки ПІБ порожнє. Список — `FlatList` над `ObservableCollection`.
 
@@ -82,10 +100,19 @@ npx uri-scheme open "studenthub://students/<id>" --ios      # або --android
 | Метод | Шлях | Опис |
 |---|---|---|
 | GET | `/health` | перевірка доступності |
-| GET | `/students?since=<ms>` | зміни після `since`, включно з видаленими (tombstones) |
-| GET | `/students/:id` | один запис |
-| PUT | `/students/:id` | створити або оновити (LWW; `409`, якщо на сервері новіша версія) |
-| DELETE | `/students/:id?updatedAt=<ms>` | soft delete |
+| POST | `/auth/check-email` | чи вільний email (крок 1 реєстрації) |
+| POST | `/auth/register` | реєстрація (Argon2id) → `{ token, user }` |
+| POST | `/auth/login` | вхід → `{ token, user }` |
+| POST | `/auth/logout` | завершити сесію |
+| GET / PATCH | `/me` | профіль / змінити ПІБ і групу |
+| GET | `/schedule` | розклад групи користувача (мок) |
+| GET | `/chat/messages?before=<ms>` | історія чату групи (останні 50) |
+| WS | `/chat/ws?token=<token>` | чат: `message`, `typing`, `react`, `presence`, `reactions` |
+| GET | `/assignments?since=<ms>` | зміни завдань після `since`, включно з tombstones |
+| PUT | `/assignments/:id` | створити або оновити (LWW; `409`, якщо на сервері новіша версія) |
+| DELETE | `/assignments/:id?updatedAt=<ms>` | soft delete |
+
+Усі маршрути, крім `/health` і `/auth/*`, потребують `Authorization: Bearer <token>`.
 
 ## Здача робіт
 

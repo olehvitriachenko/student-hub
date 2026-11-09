@@ -2,7 +2,7 @@ import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import { ObservableObject } from '../core/mvvm/ObservableObject';
 import type { Messenger } from '../core/mvvm/Messenger';
 import type { ILogger } from '../core/logging/Logger';
-import type { SqliteStudentRepository } from '../data/StudentRepository';
+import type { ISyncQueueRepository } from '../data/AssignmentRepository';
 import type { ApiClient } from './ApiClient';
 import type { IPreferences } from './Preferences';
 
@@ -27,11 +27,13 @@ export class SyncService extends ObservableObject {
   private unsubscribeNet?: () => void;
 
   constructor(
-    private readonly repo: SqliteStudentRepository,
+    private readonly repo: ISyncQueueRepository,
     private readonly api: ApiClient,
     private readonly prefs: IPreferences,
     private readonly messenger: Messenger,
     private readonly log: ILogger,
+    /** Синхронізуємо лише коли користувач увійшов в акаунт. */
+    private readonly canSync: () => boolean,
   ) {
     super();
   }
@@ -58,8 +60,15 @@ export class SyncService extends ObservableObject {
     if (this._isOnline) void this.sync();
   }
 
+  /** Вихід з акаунта: наступна синхронізація почнеться з нуля. */
+  async reset(): Promise<void> {
+    await this.prefs.remove(LAST_PULL_KEY);
+    await this.refreshPendingCount();
+    this.set('lastSyncAt', null);
+  }
+
   async sync(): Promise<void> {
-    if (this._isSyncing) return;
+    if (this._isSyncing || !this.canSync()) return;
     this.set('isSyncing', true);
     this.set('lastError', null);
     try {
@@ -72,7 +81,7 @@ export class SyncService extends ObservableObject {
       const pulled = await this.pull();
       this.set('lastSyncAt', Date.now());
       this.log.info('Sync completed', { pushed, pulled });
-      this.messenger.send('StudentsSynced', { pushed, pulled });
+      this.messenger.send('AssignmentsSynced', { pushed, pulled });
     } catch (e) {
       this.log.error(e, 'Sync failed');
       this.set('lastError', e instanceof Error ? e.message : String(e));
@@ -85,12 +94,12 @@ export class SyncService extends ObservableObject {
   private async push(): Promise<number> {
     let pushed = 0;
     for (const item of await this.repo.pending()) {
-      const student = this.repo.decodePayload(item);
+      const assignment = this.repo.decodePayload(item);
       try {
         if (item.operation === 'Delete') {
-          await this.api.delete(student.id, student.updatedAt);
+          await this.api.deleteAssignment(assignment.id, assignment.updatedAt);
         } else {
-          const { conflict, record } = await this.api.upsert(student);
+          const { conflict, record } = await this.api.upsertAssignment(assignment);
           if (conflict) {
             this.log.warn('Conflict: server version is newer, keeping server copy', { id: record.id });
             await this.repo.applyRemote(record);
@@ -109,12 +118,12 @@ export class SyncService extends ObservableObject {
 
   private async pull(): Promise<number> {
     const since = Number((await this.prefs.get(LAST_PULL_KEY)) ?? 0);
-    const remote = await this.api.pull(since);
+    const remote = await this.api.pullAssignments(since);
     let applied = 0;
     let maxUpdated = since;
-    for (const s of remote) {
-      if (await this.repo.applyRemote(s)) applied++;
-      maxUpdated = Math.max(maxUpdated, s.updatedAt);
+    for (const a of remote) {
+      if (await this.repo.applyRemote(a)) applied++;
+      maxUpdated = Math.max(maxUpdated, a.updatedAt);
     }
     await this.prefs.set(LAST_PULL_KEY, String(maxUpdated));
     return applied;
